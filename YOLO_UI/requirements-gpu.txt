@@ -1,0 +1,29 @@
+PyQt5==5.15.7
+PyQtWebEngine==5.15.7
+PyQt5-sip>=12.9.0
+PyQt5-Qt5>=5.15.2
+numpy==1.26.4
+pillow
+opencv-python
+matplotlib
+natsort==8.1.0
+termcolor==1.1.0
+qimage2ndarray==1.10.0
+lapx==0.5.5
+tqdm>=4.64.0
+PyYAML>=6.0
+scipy
+shapely
+pyclipper
+onnx
+onnxruntime-gpu
+##手动安装一次即可GPU:pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
+##CPU:pip install torch torchvision torchaudio
+pycocotools
+ultralytics
+openai
+tokenizers
+jsonlines
+json_repair
+importlib_metadata
+markdown
