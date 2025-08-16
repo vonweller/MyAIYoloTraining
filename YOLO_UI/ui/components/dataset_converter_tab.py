@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QDoubleSpinBox, QFormLayout)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from utils.dataset_converter import DatasetConverter
+from utils.onnx_converter_worker import ONNXConverterWorker
 import os
 
 class DatasetConverterWorker(QThread):
@@ -70,6 +71,7 @@ class DatasetConverterTab(QWidget):
         super().__init__()
         self.init_ui()
         self.worker = None
+        self.onnx_worker = None
     
     def init_ui(self):
         """Initialize the user interface"""
@@ -268,7 +270,6 @@ class DatasetConverterTab(QWidget):
     
     def on_format_changed(self, format_type):
         """Handle format selection change"""
-        self.input_path_edit.clear()
         self.log_text.clear()
     
     def on_mode_changed(self, mode):
@@ -280,24 +281,6 @@ class DatasetConverterTab(QWidget):
             self.overall_group.setVisible(False)
             self.split_group.setVisible(True)
         self.log_text.append(f"已选择转换模式: {mode}\n")
-    
-    def select_input_path(self):
-        """Select input dataset path"""
-        format_type = self.format_combo.currentText().lower()
-        if format_type == "coco":
-            file_path, _ = QFileDialog.getOpenFileName(
-                self, "选择COCO标注文件", "", "JSON Files (*.json)"
-            )
-            if file_path:
-                self.input_path_edit.setText(file_path)
-                self.log_text.append(f"已选择COCO标注文件: {file_path}\n")
-        else:  # VOC format
-            dir_path = QFileDialog.getExistingDirectory(
-                self, "选择VOC数据集目录"
-            )
-            if dir_path:
-                self.input_path_edit.setText(dir_path)
-                self.log_text.append(f"已选择VOC数据集目录: {dir_path}\n")
     
     def select_directory(self, title, line_edit):
         """Select directory and update line edit"""
@@ -335,7 +318,7 @@ class DatasetConverterTab(QWidget):
             # Start conversion based on mode
             if mode == "overall":
                 images_dir = self.images_dir_edit.text()
-                labels_dir = self.labels_edit.text()
+                labels_dir = self.labels_dir_edit.text()
                 
                 if not images_dir:
                     QMessageBox.warning(self, "错误", "请选择图像目录")
@@ -405,24 +388,54 @@ class DatasetConverterTab(QWidget):
             self.onnx_output_edit.setText(dir_path)
 
     def convert_to_onnx(self):
+        """使用工作线程进行ONNX转换，避免UI卡死"""
         pt_model_path = self.pt_model_edit.text()
         output_dir = self.onnx_output_edit.text()
+        
+        # 输入验证
         if not pt_model_path or not os.path.isfile(pt_model_path):
             QMessageBox.warning(self, "错误", "请选择有效的PT模型文件")
             return
         if not output_dir or not os.path.isdir(output_dir):
             QMessageBox.warning(self, "错误", "请选择有效的输出目录")
             return
-        try:
-            model_name = os.path.splitext(os.path.basename(pt_model_path))[0]
-            onnx_path = os.path.join(output_dir, f"{model_name}.onnx")
-            from ultralytics import YOLO
-            model = YOLO(pt_model_path)
-            model.export(format="onnx", imgsz=640)
-            if os.path.exists(f"{model_name}.onnx"):
-                os.rename(f"{model_name}.onnx", onnx_path)
-                QMessageBox.information(self, "转换成功", f"模型已成功转换为ONNX格式并保存到:\n{onnx_path}")
-            else:
-                QMessageBox.warning(self, "转换失败", "ONNX文件生成失败")
-        except Exception as e:
-            QMessageBox.critical(self, "转换错误", f"转换过程中发生错误:\n{str(e)}") 
+        
+        # 检查是否已有转换任务在运行
+        if self.onnx_worker and self.onnx_worker.isRunning():
+            QMessageBox.warning(self, "警告", "ONNX转换任务正在进行中，请等待完成")
+            return
+        
+        # 禁用转换按钮防止重复点击
+        self.convert_btn.setEnabled(False)
+        self.convert_btn.setText("转换中...")
+        
+        # 创建并启动ONNX转换工作线程
+        self.onnx_worker = ONNXConverterWorker(pt_model_path, output_dir)
+        self.onnx_worker.progress.connect(self.on_onnx_progress)
+        self.onnx_worker.finished.connect(self.on_onnx_finished)
+        self.onnx_worker.start()
+    
+    def on_onnx_progress(self, message):
+        """处理ONNX转换进度消息"""
+        self.log_text.append(message)
+        # 自动滚动到底部
+        self.log_text.verticalScrollBar().setValue(
+            self.log_text.verticalScrollBar().maximum()
+        )
+    
+    def on_onnx_finished(self, success, message):
+        """处理ONNX转换完成"""
+        # 恢复转换按钮状态
+        self.convert_btn.setEnabled(True)
+        self.convert_btn.setText("转换为ONNX")
+        
+        # 显示结果消息
+        if success:
+            QMessageBox.information(self, "转换成功", message)
+        else:
+            QMessageBox.critical(self, "转换失败", message)
+        
+        # 清理工作线程
+        if self.onnx_worker:
+            self.onnx_worker.deleteLater()
+            self.onnx_worker = None

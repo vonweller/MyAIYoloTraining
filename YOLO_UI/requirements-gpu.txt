@@ -1,10 +1,10 @@
-PyQt5==5.15.7
+PyQt5==5.15.10
 PyQtWebEngine==5.15.7
-PyQt5-sip>=12.9.0
+PyQt5-sip>=12.17.0
 PyQt5-Qt5>=5.15.2
-numpy==1.26.4
+numpy>=1.26.4,<2.0
 pillow
-opencv-python
+opencv-python>=4.8.1
 matplotlib
 natsort==8.1.0
 termcolor==1.1.0
@@ -15,12 +15,13 @@ PyYAML>=6.0
 scipy
 shapely
 pyclipper
-onnx
+onnx>=1.16.0,<1.17.0
 onnxruntime-gpu
+protobuf>=6.32.0
 ##手动安装一次即可GPU:pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
 ##CPU:pip install torch torchvision torchaudio
 pycocotools
-ultralytics
+ultralytics>=8.3.0
 openai
 tokenizers
 jsonlines
